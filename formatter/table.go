@@ -61,8 +61,9 @@ func FormatTableAsHTML(data []mongodb.PositionResult, coin, oraclePrice string, 
 	}
 	table += `
 <pre>
-💰Price     🟢Long(` + percentLongStr + `)
-----------------------------------
+💰Price   🟢Long(` + percentLongStr + `)  Proportion
+----------------------------------------
+
 `
 	var showData []mongodb.PositionResult
 	if len(data) > 30 {
@@ -71,6 +72,32 @@ func FormatTableAsHTML(data []mongodb.PositionResult, coin, oraclePrice string, 
 	} else {
 		showData = data
 	}
+
+	maxLong := 0.0
+	maxShort := 0.0
+	for _, row := range showData {
+		longTmp, _ := strconv.ParseFloat(row.Long.String(), 64)
+		shortTmp, _ := strconv.ParseFloat(row.Short.String(), 64)
+		if longTmp > maxLong {
+			maxLong = longTmp
+		}
+		if shortTmp < maxShort {
+			maxShort = shortTmp
+		}
+	}
+
+	percentMaxL := maxLong / longSz
+	percentMaxS := math.Abs(maxShort) / math.Abs(shortSz)
+
+	curMaxPercentLongStr := fmt.Sprintf("%.2f%%", percentMaxL*100)
+	curMaxPercentShortStr := fmt.Sprintf("%.2f%%", percentMaxS*100)
+
+	tmpMaxL := fmt.Sprintf("%9.2f(%s)", maxLong, curMaxPercentLongStr)
+	tmpMaxS := fmt.Sprintf("%9.2f(%s)", maxShort, curMaxPercentShortStr)
+
+	maxLengthL := len(tmpMaxL)
+	maxLengthS := len(tmpMaxS)
+
 	// 创建表格行
 	tableLong := ``
 	tableShort := ``
@@ -84,13 +111,34 @@ func FormatTableAsHTML(data []mongodb.PositionResult, coin, oraclePrice string, 
 
 		curPercentLongStr := fmt.Sprintf("%.2f%%", percentL*100)
 		curPercentShortStr := fmt.Sprintf("%.2f%%", percentS*100)
+
+		barsL := formatPercentWithBars(longF / maxLong)
+		barsS := formatPercentWithBars(math.Abs(shortF) / math.Abs(maxShort))
+
+		n := "2"
+		if binF > 99999 {
+			n = "1"
+		}
+
+		curStrL := fmt.Sprintf("%9.2f(%s)", longF, curPercentLongStr)
+		curStrS := fmt.Sprintf("%9.2f(%s)", shortF, curPercentShortStr)
+		//为了列对齐，补充空格
+		spacesNumL := "  "
+		spacesNumS := "  "
+		for n := 0; n < (maxLengthL - len(curStrL)); n++ {
+			spacesNumL += " "
+		}
+		for n := 0; n < (maxLengthS - len(curStrS)); n++ {
+			spacesNumS += " "
+		}
+
 		// 2. 判断是否为最接近的行，如果是则加粗
 		if i == closestIndex {
-			tableLong += fmt.Sprintf("🔸%-4.2f    %9.2f(%s)\n", binF, longF, curPercentLongStr)
-			tableShort += fmt.Sprintf("🔸%-4.2f    %9.2f(%s)\n", binF, shortF, curPercentShortStr)
+			tableLong += fmt.Sprintf("🔸%-4."+n+"f  %9.2f(%s)%s%s\n", binF, longF, curPercentLongStr, spacesNumL, barsL)
+			tableShort += fmt.Sprintf("🔸%-4."+n+"f  %9.2f(%s)%s%s\n", binF, shortF, curPercentShortStr, spacesNumS, barsS)
 		} else {
-			tableLong += fmt.Sprintf("🔹%-4.2f    %9.2f(%s)\n", binF, longF, curPercentLongStr)
-			tableShort += fmt.Sprintf("🔹%-4.2f    %9.2f(%s)\n", binF, shortF, curPercentShortStr)
+			tableLong += fmt.Sprintf("🔹%-4."+n+"f  %9.2f(%s)%s%s\n", binF, longF, curPercentLongStr, spacesNumL, barsL)
+			tableShort += fmt.Sprintf("🔹%-4."+n+"f  %9.2f(%s)%s%s\n", binF, shortF, curPercentShortStr, spacesNumS, barsS)
 		}
 	}
 
@@ -98,8 +146,8 @@ func FormatTableAsHTML(data []mongodb.PositionResult, coin, oraclePrice string, 
 	table += fmt.Sprintf("<b>统计 "+coin+" Short 总数: %9.2f</b>", shortSz)
 	table += `
 <pre>
-💰Price     🔴Short(` + percentShortStr + `)
-----------------------------------
+💰Price     🔴Short(` + percentShortStr + `)  Proportion
+----------------------------------------
 `
 	table += tableShort + "</pre>"
 	// 创建交易页面链接
@@ -109,4 +157,29 @@ func FormatTableAsHTML(data []mongodb.PositionResult, coin, oraclePrice string, 
 	}
 
 	return table
+}
+
+func formatPercentWithBars(percent float64) string {
+	// 确保百分比值在0到1之间
+	if percent < 0 {
+		percent = 0
+	}
+	if percent > 1 {
+		percent = 1
+	}
+
+	// 计算需要显示的竖线数量：任何大于0的比例都至少显示1个"|"
+	var numBars int
+	if percent == 0 {
+		numBars = 0
+	} else {
+		numBars = int(math.Ceil(percent * 15)) // 关键修改：10 -> 15
+	}
+
+	// 构建竖线字符串
+	bars := strings.Repeat("|", numBars)
+	fmt.Sprintf("%s (%.1f%%)", bars, percent*100)
+	// 为了直观，也返回原始的百分比数值
+	//return fmt.Sprintf("%s (%.1f%%)", bars, percent*100)
+	return bars
 }
