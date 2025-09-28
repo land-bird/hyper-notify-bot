@@ -61,8 +61,8 @@ func FormatTableAsHTML(data []mongodb.PositionResult, coin, oraclePrice string, 
 	}
 	table += `
 <pre>
-💰Price   🟢Long(` + percentLongStr + `)  Proportion
-----------------------------------------
+💰Price   🟢Long(` + percentLongStr + `)
+------------------------------
 
 `
 	var showData []mongodb.PositionResult
@@ -75,14 +75,19 @@ func FormatTableAsHTML(data []mongodb.PositionResult, coin, oraclePrice string, 
 
 	maxLong := 0.0
 	maxShort := 0.0
-	for _, row := range showData {
+	maxLongVauleIndex := 0
+	maxShortVauleIndex := 0
+	for i, row := range showData {
 		longTmp, _ := strconv.ParseFloat(row.Long.String(), 64)
 		shortTmp, _ := strconv.ParseFloat(row.Short.String(), 64)
+		//maxBinF, _ := strconv.ParseFloat(row.Bin.String(), 64)
 		if longTmp > maxLong {
 			maxLong = longTmp
+			maxLongVauleIndex = i
 		}
 		if shortTmp < maxShort {
 			maxShort = shortTmp
+			maxShortVauleIndex = i
 		}
 	}
 
@@ -92,8 +97,14 @@ func FormatTableAsHTML(data []mongodb.PositionResult, coin, oraclePrice string, 
 	curMaxPercentLongStr := fmt.Sprintf("%.2f%%", percentMaxL*100)
 	curMaxPercentShortStr := fmt.Sprintf("%.2f%%", percentMaxS*100)
 
-	tmpMaxL := fmt.Sprintf("%9.2f(%s)", maxLong, curMaxPercentLongStr)
-	tmpMaxS := fmt.Sprintf("%9.2f(%s)", maxShort, curMaxPercentShortStr)
+	maxLongBinF, _ := strconv.ParseFloat(showData[maxLongVauleIndex].Bin.String(), 64)
+	maxShortBinF, _ := strconv.ParseFloat(showData[maxShortVauleIndex].Bin.String(), 64)
+
+	//tmpMaxL := fmt.Sprintf("%9.2f(%s)", maxLong, curMaxPercentLongStr)
+	//tmpMaxS := fmt.Sprintf("%9.2f(%s)", maxShort, curMaxPercentShortStr)
+
+	tmpMaxL := fmt.Sprintf("🔸%-4.2f  %9.2f(%s)", maxLongBinF, maxLong, curMaxPercentLongStr)
+	tmpMaxS := fmt.Sprintf("🔸%-4.2f  %9.2f(%s)", maxShortBinF, maxShort, curMaxPercentShortStr)
 
 	maxLengthL := len(tmpMaxL)
 	maxLengthS := len(tmpMaxS)
@@ -134,20 +145,36 @@ func FormatTableAsHTML(data []mongodb.PositionResult, coin, oraclePrice string, 
 
 		// 2. 判断是否为最接近的行，如果是则加粗
 		if i == closestIndex {
-			tableLong += fmt.Sprintf("🔸%-4."+n+"f  %9.2f(%s)%s%s\n", binF, longF, curPercentLongStr, spacesNumL, barsL)
-			tableShort += fmt.Sprintf("🔸%-4."+n+"f  %9.2f(%s)%s%s\n", binF, shortF, curPercentShortStr, spacesNumS, barsS)
+			tableLong += fmt.Sprintf("🔸%-4."+n+"f  %9.2f(%s)\n", binF, longF, curPercentLongStr)
+			tableShort += fmt.Sprintf("🔸%-4."+n+"f  %9.2f(%s)\n", binF, shortF, curPercentShortStr)
 		} else {
-			tableLong += fmt.Sprintf("🔹%-4."+n+"f  %9.2f(%s)%s%s\n", binF, longF, curPercentLongStr, spacesNumL, barsL)
-			tableShort += fmt.Sprintf("🔹%-4."+n+"f  %9.2f(%s)%s%s\n", binF, shortF, curPercentShortStr, spacesNumS, barsS)
+			tableLong += fmt.Sprintf("🔹%-4."+n+"f  %9.2f(%s)\n", binF, longF, curPercentLongStr)
+			tableShort += fmt.Sprintf("🔹%-4."+n+"f  %9.2f(%s)\n", binF, shortF, curPercentShortStr)
 		}
+
+		//为了列对齐，补充空格
+		spacesBeginNumL := ""
+		spacesBeginNumS := ""
+		for n := 0; n < (maxLengthL - len(barsL) - 3); n++ {
+			spacesBeginNumL += " "
+		}
+		for n := 0; n < (maxLengthS - len(barsS) - 3); n++ {
+			spacesBeginNumS += " "
+		}
+
+		tableLong += fmt.Sprintf("%s%s\n", spacesBeginNumL, barsL)
+		tableLong += "------------------------------\n"
+
+		tableShort += fmt.Sprintf("%s%s\n", spacesBeginNumS, barsS)
+		tableShort += "------------------------------\n"
 	}
 
 	table += tableLong + "</pre>\n\n"
 	table += fmt.Sprintf("<b>统计 "+coin+" Short 总数: %9.2f</b>", shortSz)
 	table += `
 <pre>
-💰Price     🔴Short(` + percentShortStr + `)  Proportion
-----------------------------------------
+💰Price     🔴Short(` + percentShortStr + `)
+------------------------------
 `
 	table += tableShort + "</pre>"
 	// 创建交易页面链接
