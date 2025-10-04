@@ -56,8 +56,8 @@ func FormatTableAsHTML(data []mongodb.PositionResult, coin, oraclePrice string, 
 	table := `<b>📊 Position Data</b>`
 	// 添加 Oracle 价格
 	if oraclePrice != "" {
-		table += fmt.Sprintf("\n\n<b>当前 "+coin+" Oracle 价格: %s</b>", oraclePrice)
-		table += fmt.Sprintf("\n\n<b>统计 "+coin+" Long 总数: %9.2f</b>", longSz)
+		table += fmt.Sprintf("\n\n<b>当前 "+coin+" Oracle 价格: %s</b>", formatStringNumber(oraclePrice))
+		table += fmt.Sprintf("\n\n<b>统计 "+coin+" Long 总数: %9s</b>", formatStringNumber(fmt.Sprintf("%.2f", longSz)))
 	}
 	table += `
 <pre>
@@ -123,8 +123,8 @@ func FormatTableAsHTML(data []mongodb.PositionResult, coin, oraclePrice string, 
 		curPercentLongStr := fmt.Sprintf("%.2f%%", percentL*100)
 		curPercentShortStr := fmt.Sprintf("%.2f%%", percentS*100)
 
-		barsL := formatPercentWithBars(longF / maxLong)
-		barsS := formatPercentWithBars(math.Abs(shortF) / math.Abs(maxShort))
+		//barsL := formatPercentWithBars(longF / maxLong)
+		//barsS := formatPercentWithBars(math.Abs(shortF) / math.Abs(maxShort))
 
 		n := "2"
 		if binF > 99999 {
@@ -145,32 +145,32 @@ func FormatTableAsHTML(data []mongodb.PositionResult, coin, oraclePrice string, 
 
 		// 2. 判断是否为最接近的行，如果是则加粗
 		if i == closestIndex {
-			tableLong += fmt.Sprintf("🔸%-4."+n+"f  %9.2f(%s)\n", binF, longF, curPercentLongStr)
-			tableShort += fmt.Sprintf("🔸%-4."+n+"f  %9.2f(%s)\n", binF, shortF, curPercentShortStr)
+			tableLong += fmt.Sprintf("🔸%-4."+n+"f  %9s(%s)\n", binF, formatStringNumber(fmt.Sprintf("%.2f ", longF)), curPercentLongStr)
+			tableShort += fmt.Sprintf("🔸%-4."+n+"f  %9s(%s)\n", binF, formatStringNumber(fmt.Sprintf("%.2f ", shortF)), curPercentShortStr)
 		} else {
-			tableLong += fmt.Sprintf("🔹%-4."+n+"f  %9.2f(%s)\n", binF, longF, curPercentLongStr)
-			tableShort += fmt.Sprintf("🔹%-4."+n+"f  %9.2f(%s)\n", binF, shortF, curPercentShortStr)
+			tableLong += fmt.Sprintf("🔹%-4."+n+"f  %9s(%s)\n", binF, formatStringNumber(fmt.Sprintf("%.2f ", longF)), curPercentLongStr)
+			tableShort += fmt.Sprintf("🔹%-4."+n+"f  %9s(%s)\n", binF, formatStringNumber(fmt.Sprintf("%.2f ", shortF)), curPercentShortStr)
 		}
 
-		//为了列对齐，补充空格
-		spacesBeginNumL := ""
-		spacesBeginNumS := ""
-		for n := 0; n < (maxLengthL - len(barsL) - 3); n++ {
-			spacesBeginNumL += " "
-		}
-		for n := 0; n < (maxLengthS - len(barsS) - 3); n++ {
-			spacesBeginNumS += " "
-		}
-
-		tableLong += fmt.Sprintf("%s%s\n", spacesBeginNumL, barsL)
-		tableLong += "------------------------------\n"
-
-		tableShort += fmt.Sprintf("%s%s\n", spacesBeginNumS, barsS)
-		tableShort += "------------------------------\n"
+		////为了列对齐，补充空格
+		//spacesBeginNumL := ""
+		//spacesBeginNumS := ""
+		//for n := 0; n < (maxLengthL - len(barsL) - 3); n++ {
+		//	spacesBeginNumL += " "
+		//}
+		//for n := 0; n < (maxLengthS - len(barsS) - 3); n++ {
+		//	spacesBeginNumS += " "
+		//}
+		//
+		//tableLong += fmt.Sprintf("%s%s\n", spacesBeginNumL, barsL)
+		//tableLong += "------------------------------\n"
+		//
+		//tableShort += fmt.Sprintf("%s%s\n", spacesBeginNumS, barsS)
+		//tableShort += "------------------------------\n"
 	}
 
 	table += tableLong + "</pre>\n\n"
-	table += fmt.Sprintf("<b>统计 "+coin+" Short 总数: %9.2f</b>", shortSz)
+	table += fmt.Sprintf("<b>统计 "+coin+" Short 总数: %9s</b>", formatStringNumber(fmt.Sprintf("%.2f ", shortSz)))
 	table += `
 <pre>
 💰Price     🔴Short(` + percentShortStr + `)
@@ -209,4 +209,45 @@ func formatPercentWithBars(percent float64) string {
 	// 为了直观，也返回原始的百分比数值
 	//return fmt.Sprintf("%s (%.1f%%)", bars, percent*100)
 	return bars
+}
+
+func formatStringNumber(s string) string {
+	// 处理负号
+	sign := ""
+	if s != "" && s[0] == '-' {
+		sign = "-"
+		s = s[1:]
+	}
+
+	// 分离整数部分与小数部分
+	parts := strings.Split(s, ".")
+	integerPart := parts[0]
+	decimalPart := ""
+	if len(parts) > 1 {
+		decimalPart = "." + parts[1]
+	}
+
+	// 去除整数部分的前导零
+	integerPart = strings.TrimLeft(integerPart, "0")
+	if integerPart == "" {
+		integerPart = "0"
+	}
+
+	fmt.Println("------------------", integerPart, len(integerPart))
+	if len(integerPart) <= 3 {
+		return sign + integerPart + decimalPart
+	}
+
+	// 为整数部分添加千分位逗号
+	var formattedInteger strings.Builder
+	n := len(integerPart)
+	for i, runeValue := range integerPart {
+		formattedInteger.WriteRune(runeValue)
+		// 当前位之后还剩多少位？如果能被3整除且不是最后一位，则添加逗号
+		if (n-i-1)%3 == 0 && i != n-1 {
+			formattedInteger.WriteString(",")
+		}
+	}
+
+	return sign + formattedInteger.String() + decimalPart
 }
